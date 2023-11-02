@@ -6,7 +6,7 @@ Seus recursos da AWS são provisionados automaticamente em uma VPC padrão pront
 
 ## Private connection
 
-![DXvsVPN](./images/DXxVPN-layout.png)
+![DXvsVPN](./imagens/DXxVPN-layout.png)
 
 ## Referências
 
