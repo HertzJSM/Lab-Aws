@@ -1,5 +1,5 @@
-AWSTemplateFormatVersion: 2023-11-01
-Description: Deploys VPC, EC2 instance, and installs Grafana
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploys vpc and an EC2 instance
 Parameters:
   InstanceTypeParameter:
     Type: String
@@ -46,6 +46,21 @@ Resources:
       Tags:
         - Key: Name
           Value: LAB_SYSOPS_PUBLIC_1
+  VPC1PublicSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref VPC1
+      AvailabilityZone: !Select 
+        - '1'
+        - !GetAZs us-east-1
+      MapPublicIpOnLaunch: 'true'
+      CidrBlock: !FindInMap 
+        - Subnet1Config
+        - Public2
+        - CIDR
+      Tags:
+        - Key: Name
+          Value: LAB_SYSOPS_PUBLIC_2
   InternetGateway1:
     Type: 'AWS::EC2::InternetGateway'
     Properties:
@@ -76,6 +91,11 @@ Resources:
     Properties:
       SubnetId: !Ref VPC1PublicSubnet1
       RouteTableId: !Ref PublicRouteTable1
+  PublicSubnet1RouteTableAssociation2:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref VPC1PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable1
   PublicNetworkAcl1:
     Type: 'AWS::EC2::NetworkAcl'
     Properties:
@@ -95,6 +115,42 @@ Resources:
       PortRange:
         From: '80'
         To: '80'
+  InboundHTTPSPublicNetworkAcl1Entry:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl1
+      RuleNumber: '101'
+      Protocol: '6'
+      RuleAction: allow
+      Egress: 'false'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '443'
+        To: '443'
+  InboundSSHPublicNetworkAcl1Entry:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl1
+      RuleNumber: '102'
+      Protocol: '6'
+      RuleAction: allow
+      Egress: 'false'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '22'
+        To: '22'
+  InboundEmphemeralPublicNetworkAcl1Entry:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref PublicNetworkAcl1
+      RuleNumber: '103'
+      Protocol: '6'
+      RuleAction: allow
+      Egress: 'false'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '1024'
+        To: '65535'
   OutboundPublicNetworkAcl1Entry:
     Type: 'AWS::EC2::NetworkAclEntry'
     Properties:
@@ -112,11 +168,16 @@ Resources:
     Properties:
       SubnetId: !Ref VPC1PublicSubnet1
       NetworkAclId: !Ref PublicNetworkAcl1
+  PublicSubnet1NetworkAclAssociation2:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref VPC1PublicSubnet2
+      NetworkAclId: !Ref PublicNetworkAcl1
   EC2Instance1:
     Type: 'AWS::EC2::Instance'
     Properties:
       InstanceType: !Ref InstanceTypeParameter
-      ImageId: 'ami-0b0dcb5067f052a63'
+      ImageId: 'ami-05c13eab67c5d8861'
       UserData: 
         Fn::Base64:
           !Sub |
@@ -124,7 +185,7 @@ Resources:
             yum install -y httpd
             systemctl start httpd
             systemctl enable httpd
-            sudo echo "<html><h1>Hello SysOps Admin</h1></html>" > /var/www/html/index.html
+            sudo echo "<html><h1>Hertz seu novo SRE</h1></html>" > /var/www/html/index.html
       NetworkInterfaces:
         - GroupSet:
             - !Ref EC2SecurityGroup1
@@ -150,25 +211,6 @@ Resources:
           ToPort: 80
           IpProtocol: tcp
       GroupName: LAB_SYSOPS_SG
-
-  # Adicionando a instalação e configuração do Grafana
-  EC2InstanceMonitoring:
-    Type: 'AWS::EC2::Instance'
-    Properties:
-      InstanceType: !Ref InstanceTypeParameter
-      ImageId: 'ami-0b0dcb5067f052a63'
-      UserData: 
-        Fn::Base64: 
-          !Sub |
-            #!/bin/bash
-            # Atualiza a lista de pacotes
-            sudo yum update -y
-
-            # Instala o Grafana
-            sudo yum install -y https://dl.grafana.com/oss/release/grafana-8.2.0-1.x86_64.rpm
-
-            # Habilita e inicia o serviço do Grafana
-            sudo systemctl enable grafana-server
-            sudo systemctl start grafana-server
-
-            # Configura o Graf
+      Tags:
+        - Key: Name
+          Value: LAB_SYSOPS_SG
